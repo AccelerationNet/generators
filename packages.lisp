@@ -8,7 +8,7 @@
    #:yielding
    #:force
    #:reset
-   #:gen
+   #:generator
    #:stop-iteration
    #:generate-lisp-tree-nodes
    #:generate-lisp-tree-leaves
