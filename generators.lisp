@@ -58,7 +58,7 @@
     (alexandria:with-unique-names (g end?)
       `(let ((,g ,gen))
         (declare (ignorable ,g))
-        (,kwd ((,node) ,end?) next ,(%mv-gen gen))
+        (,kwd ((,node) ,end?) next (%mv-gen ,gen))
         (until ,end?)))))
 
 (defgeneric force (generator)
@@ -66,22 +66,20 @@
   (:method ((g generator))
     (iter (for n in-generator g) (collect n))))
 
-(defun maybe-dequote (thing)
-  "Util for simplifying macro code, by removing any quotes"
-  (etypecase thing
-    (list (ecase (first thing)
-            (quote (cadr thing))))
-    (symbol thing)))
-
-(defun %mv-gen (g &optional (stop-exception 'stop-iteration))
+(defun %mv-gen (g)
   "Generates a value from the generator, if the generator throws
    stop iteration returns (values nil T),
    turns off call/cc so that this works"
-  `(cl-cont:without-call/cc
-    (handler-case (list (multiple-value-list (next ,g))
-                        nil)
-      (,(maybe-dequote stop-exception) ()
-        (list nil T)))))
+  (cl-cont:without-call/cc
+    (handler-bind
+        ((error
+           (lambda (c)
+             (when (typep c (final-exception g))
+               (return-from %mv-gen (list nil T))))))
+      (list (multiple-value-list (next g)) nil))))
+
+(defun only-one? (list)
+  (and (listp list) (null (cdr list)) (car list)))
 
 (defmacro make-generator ((&key (final-value nil final-value-p)
                            (final-exception '(quote stop-iteration))
@@ -91,25 +89,29 @@
    body, you can yield any number of values that you wish by calling
    (yield &rest args) which is scoped to the body
   "
-  (alexandria:with-unique-names (gen other-gen)
+  (alexandria:with-unique-names (gen)
     `(let ((,gen (make-instance 'generator
                   :use-final-value? ,final-value-p
                   :final-value ,final-value
                   :final-exception ,final-exception
                   :name ,name)))
       (cl-cont:with-call/cc
+        ;; set and return the orignal
+        (cl-cont:let/cc k
+          (unless (original-continuation ,gen)
+            (setf (original-continuation ,gen) k)
+            (reset ,gen)
+            ,gen))
         (labels ((yield (&rest args)
                    (cl-cont:let/cc k
-                     (unless (original-continuation ,gen)
-                       (setf (original-continuation ,gen) k))
                      (setf (continuation ,gen) k)
                      (apply #'values args)))
-                 (yielding (,other-gen)
+                 (yielding (&rest other-gens)
                    ;; NB: !! iterate fails here (we dont always yield everything), use loop !!
-                   (loop for (vals end?) = ,(%mv-gen other-gen final-exception)
-                         until end?
-                         do (apply #'yield vals))))
-          (yield ,gen)
+                   (loop for g in (alexandria:ensure-list other-gens)
+                         do (loop for (vals end?) = (%mv-gen g)
+                                  until end?
+                                  do (apply #'yield vals)))))
           ,@body
           (setf (finished? ,gen) T (continuation ,gen) nil)
           (loop (next ,gen)))))))
@@ -122,14 +124,14 @@
         (atom (yield n))
         (list
          (unless leaves-only? (yield n))
-         (yielding (generate-lisp-tree-nodes n)))))))
+         (yielding (generate-lisp-tree-nodes n leaves-only?)))))))
 
 (iterate:defmacro-driver (FOR node a-node-of-lisp-tree tree)
   (let* ((kwd (if generate 'generate 'for)))
     (alexandria:with-unique-names (gen end?)
       `(progn
         (with ,gen = (generate-lisp-tree-nodes ,tree))
-        (,kwd ((,node) ,end?) next ,(%mv-gen gen))
+        (,kwd ((,node) ,end?) next (%mv-gen ,gen))
         (until ,end?)))))
 
 (iterate:defmacro-driver (FOR node a-leaf-of-lisp-tree tree)
@@ -137,5 +139,5 @@
     (alexandria:with-unique-names (gen end?)
       `(progn
         (with ,gen = (generate-lisp-tree-nodes ,tree T))
-        (,kwd ((,node) ,end?) next ,(%mv-gen gen))
+        (,kwd ((,node) ,end?) next (%mv-gen ,gen))
         (until ,end?)))))

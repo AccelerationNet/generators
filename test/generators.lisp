@@ -64,7 +64,7 @@
 		 6 (7 8) 7 8 (9 10) 9 10
 		 (11 (12 13)) 11 (12 13) 12 13
 		 ))
-	 (leaves (generate-lisp-tree-leaves tree))
+	 (leaves (generate-lisp-tree-nodes tree t))
 	 (nodes (generate-lisp-tree-nodes tree)))
     (lisp-unit:assert-equal
      exp (force leaves))

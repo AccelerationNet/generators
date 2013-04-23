@@ -3,6 +3,10 @@
 Generators is a library that provides python style generators in
 common lisp, by using cl-cont delimited continuations
 
+This library is more of an interesting toy, though as far as I know it
+does work.  I dont think I have ever used this in application code,
+though I think that with care, it could be.
+
 ## Requirements
 
  * [CL-CONT](http://common-lisp.net/project/cl-cont/) provides the
@@ -27,14 +31,12 @@ common lisp, by using cl-cont delimited continuations
 
 Creates a new generator, the body of which can yield values to the calling scope
 
-
 ### yield
-yield - returns the next value from the generator
+yield - returns the next value from the generator to the caller
 
 ### yielding
+yielding - yields every value in the passed in generators
 
-yielding - given a generator, yields all of its values
-Useful for yielding all the values of one generator from a nother
 
 ## Iterate clauses
 

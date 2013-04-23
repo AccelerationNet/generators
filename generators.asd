@@ -13,7 +13,7 @@
   :version "0.1"
   :components ((:file "packages")
                (:file "generators"))
-  :depends-on (:cl-cont :alexandria :collectors))
+  :depends-on (:cl-cont :alexandria :iterate))
 
 
 (defsystem :generators-test
